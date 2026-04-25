@@ -1,0 +1,19 @@
+# --- VS Code Extension (codecompassai folder) ---
+**/node_modules/
+**/out/
+**/dist/
+.vscode-test/
+*.vsix
+
+# --- Python Logic (brain folder & main files) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+env/
+
+# --- System & Logs ---
+.DS_Store
+Thumbs.db
+*.log
