@@ -28,7 +28,7 @@ else:
 
 
 # Load model
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+model = genai.GenerativeModel(model_name="models/gemini-2.5-flash")
 # Define expected input structure
 class SessionData(BaseModel):
     totalSaves: int
