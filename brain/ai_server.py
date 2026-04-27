@@ -60,8 +60,7 @@ Explain:
 Keep it short, clear, and helpful.Dont make it bulky  keep it light and
 in points and you dont have to repeat the question just make a heading and
 start giving points for each question
-use emojis to make it look appealing.
-
+use emojis to make it look more fun.
 """
 
     try:
