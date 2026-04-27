@@ -4,15 +4,23 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+
+# 1. Get the exact path to the .env file in the 'brain' folder
+# This finds the folder where ai_server.py is, then looks for .env there
+env_path = Path(__file__).parent / ".env"
 
 #load the environment variables
-load_dotenv() 
+load_dotenv(dotenv_path = env_path, override=True) 
+# 3. Debug Print
+print(f"📁 Looking for .env at: {env_path}")
 
 # Create FastAPI app
 app = FastAPI()
 
 # Configure Gemini API
 api_key = os.getenv("GEMINI_API_KEY")
+
 if not api_key:
     print("❌ ERROR: GEMINI_API_KEY not found in .env file!")
 else:
@@ -20,8 +28,7 @@ else:
 
 
 # Load model
-model = genai.GenerativeModel("gemini-pro")
-
+model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
 # Define expected input structure
 class SessionData(BaseModel):
     totalSaves: int
