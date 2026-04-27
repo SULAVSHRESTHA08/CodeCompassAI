@@ -28,7 +28,7 @@ else:
 
 
 # Load model
-model = genai.GenerativeModel(model_name="models/gemini-2.5-flash") #gemini model 2.5 worked 
+model = genai.GenerativeModel(model_name="models/gemini-2.5-flash-lite") #gemini model 2.5 worked 
 # Define expected input structure
 class SessionData(BaseModel):
     totalSaves: int
@@ -57,7 +57,11 @@ Explain:
 2. What they were likely trying to do
 3. Suggest the next coding step
 
-Keep it short, clear, and helpful.
+Keep it short, clear, and helpful.Dont make it bulky  keep it light and
+in points and you dont have to repeat the question just make a heading and
+start giving points for each question
+use emojis to make it look appealing.
+
 """
 
     try:
