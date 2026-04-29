@@ -196,7 +196,7 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
         <div class="card" style="border-left: 4px solid #3794ef;">
             <h3>🤖 AI Insights</h3>
 
-            <p>${formatAI(aiSummary) || "Thinking....."}</p>
+            ${formatAI(aiSummary) || "<p>Thinking.....</p>"}
         </div>
 
         <hr/>
@@ -211,31 +211,30 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
 }
 // Updated AI summary Visuals
 function formatAI(text: string) {
+    // This Regex looks for the keywords even if they are all on one line
+    const summaryMatch = text.match(/SUMMARY:(.*?)(?=INTENT:|NEXT STEP:|$)/is);
+    const intentMatch = text.match(/INTENT:(.*?)(?=SUMMARY:|NEXT STEP:|$)/is);
+    const nextMatch = text.match(/NEXT STEP:(.*?)(?=SUMMARY:|INTENT:|$)/is);
+
     const sections = {
-        summary: "",
-        intent: "",
-        next: ""
+        summary: summaryMatch ? summaryMatch[1].trim() : "",
+        intent: intentMatch ? intentMatch[1].trim() : "",
+        next: nextMatch ? nextMatch[1].trim() : ""
     };
 
-    text.split("\n").forEach(line => {
-        if (line.startsWith("SUMMARY:")) {
-            sections.summary = line.replace("SUMMARY:", "").trim();
-        } else if (line.startsWith("INTENT:")) {
-            sections.intent = line.replace("INTENT:", "").trim();
-        } else if (line.startsWith("NEXT STEP:")) {
-            sections.next = line.replace("NEXT STEP:", "").trim();
-        }
-    });
+    // If Regex fails (maybe AI didn't use keywords), show the raw text as fallback
+    if (!sections.summary && !sections.intent && !sections.next) {
+        return `<p>${text}</p>`;
+    }
 
     return `
         <div>
-            <p><strong>📌 Summary:</strong> ${sections.summary}</p>
-            <p><strong>🎯 Intent:</strong> ${sections.intent}</p>
-            <p><strong>🚀 Next Step:</strong> ${sections.next}</p>
+            <p><strong>📌 Summary:</strong> ${sections.summary || "Not detected"}</p>
+            <p><strong>🎯 Intent:</strong> ${sections.intent || "Not detected"}</p>
+            <p><strong>🚀 Next Step:</strong> ${sections.next || "Not detected"}</p>
         </div>
     `;
-}
-// Send session data to python AI server
+}// Send session data to python AI server
 async function getAISummary(sessionData: any)
 {
   try

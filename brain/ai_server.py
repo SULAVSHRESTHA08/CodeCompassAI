@@ -55,18 +55,17 @@ Here is a developer's session:
 Timeline:
 {data.timeline}
 
-Respond in this format:
+CRITICAL INSTRUCTION: You must respond ONLY in the following format. 
+Do not write a paragraph. Do not use bold on the headers.
 
-SUMMARY:
-(What the developer was doing)
+SUMMARY: 
+(Write a 1-sentence summary here)
 
-INTENT:
-(What they were trying to achieve)
+INTENT: 
+(Write the developer's goal here)
 
-NEXT STEP:
-(Specific action they should take next)
-
-Keep it short and practical.
+NEXT STEP: 
+(Write one specific coding task here)
 """
 
     try:
