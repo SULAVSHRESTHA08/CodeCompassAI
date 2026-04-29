@@ -44,7 +44,8 @@ def summarize(data: SessionData):
     prompt = f"""
 You are a coding assistant.
 
-Here is a developer's session data:
+Here is a developer's session:
+
 - Total Saves: {data.totalSaves}
 - Last File: {data.lastFile}
 - Most Edited File: {data.mostEditedFile}
@@ -52,23 +53,30 @@ Here is a developer's session data:
 Timeline:
 {data.timeline}
 
-Explain:
-1. What the developer was working on
-2. What they were likely trying to do
-3. Suggest the next coding step
+Respond in this format:
 
-Keep it short, clear, and helpful.Dont make it bulky  keep it light and
-in points and you dont have to repeat the question just make a heading and
-start giving points for each question
-use emojis to make it look more fun.
+SUMMARY:
+(What the developer was doing)
+
+INTENT:
+(What they were trying to achieve)
+
+NEXT STEP:
+(Specific action they should take next)
+
+Keep it short and practical.
 """
 
     try:
         # 🔥 Call Gemini
         response = model.generate_content(prompt)
 
-        return {"summary": response.text}
+        return {
+            "summary": response.text
+               }
 
     except Exception as e:
         # Fallback if AI fails
-        return {"summary": f"⚠️ AI Error: {str(e)}"}
+        return {
+            "summary": f"⚠️ AI Error: {str(e)}"
+               }
