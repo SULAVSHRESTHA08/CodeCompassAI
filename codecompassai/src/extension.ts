@@ -187,7 +187,8 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
 
         <div class="card" style="border-left: 4px solid #3794ef;">
             <h3>🤖 AI Insights</h3>
-            <p>${aiSummary || "Waiting for AI to analyze..."}</p>
+
+            <p>${formatAI(aiSummary) || "Thinking....."}</p>
         </div>
 
         <hr/>
@@ -198,6 +199,32 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
         </ul>
     </body>
     </html>
+    `;
+}
+// Updated AI summary Visuals
+function formatAI(text: string) {
+    const sections = {
+        summary: "",
+        intent: "",
+        next: ""
+    };
+
+    text.split("\n").forEach(line => {
+        if (line.startsWith("SUMMARY:")) {
+            sections.summary = line.replace("SUMMARY:", "").trim();
+        } else if (line.startsWith("INTENT:")) {
+            sections.intent = line.replace("INTENT:", "").trim();
+        } else if (line.startsWith("NEXT STEP:")) {
+            sections.next = line.replace("NEXT STEP:", "").trim();
+        }
+    });
+
+    return `
+        <div>
+            <p><strong>📌 Summary:</strong> ${sections.summary}</p>
+            <p><strong>🎯 Intent:</strong> ${sections.intent}</p>
+            <p><strong>🚀 Next Step:</strong> ${sections.next}</p>
+        </div>
     `;
 }
 // Send session data to python AI server
@@ -228,7 +255,7 @@ function buildSessionSummary(timeline: any[]) {
 
     const totalSaves = timeline.length;
     const lastFile = path.basename(timeline[timeline.length - 1].file);
-
+    const recentFiles = timeline.slice(-5).map(e => e.file);
     // Count which file appears most in the timeline
     const counts: { [key: string]: number } = {};
     timeline.forEach(entry => {
@@ -241,7 +268,8 @@ function buildSessionSummary(timeline: any[]) {
     return {
         totalSaves,
         lastFile,
-        mostEditedFile
+        mostEditedFile,
+        recentFiles
     };
 }
 // This method is called when your extension is deactivated
