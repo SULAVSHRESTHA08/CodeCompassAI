@@ -145,11 +145,19 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     // Build basic summary 
 	const summaryData = buildSessionSummary(timeline);
 	
+    
+    //Creating a clean object that matches the python 'SessionData' class
+    const payload = {
+        totalSaves: summaryData.totalSaves,
+        lastFile: summaryData.lastFile,
+        mostEditedFile: summaryData.mostEditedFile,
+        recentFiles: summaryData.recentFiles, // This was likely missing or misnamed before
+        timeline: timeline
+    };
 	// Call Python AI
-	const aiSummary = await getAISummary({
-		...summaryData,
-		timeline
-	});
+	const aiSummary = await getAISummary(
+	     payload	
+    );
 	
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);

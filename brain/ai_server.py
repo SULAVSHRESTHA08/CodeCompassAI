@@ -35,7 +35,7 @@ class SessionData(BaseModel):
     lastFile: str
     mostEditedFile: str
     timeline: list
-    recentFiles: list
+    recentFiles: list = []
 
 # Create API endpoint
 @app.post("/summarize")
