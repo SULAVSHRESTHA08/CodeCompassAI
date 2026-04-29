@@ -20,6 +20,10 @@
       {
         "command": "codecompassai.showSessionSummary",
         "title": "CodeCompass: Show Session Summary"
+      },
+      {
+        "command": "codecompassai.resumeWork",
+        "title": "COdeCompass: Resume Work"
       }
     ]
   },
