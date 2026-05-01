@@ -2,6 +2,10 @@
   "name": "codecompass-project-root",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "compile": "cd codecompassai && npm run compile",
+    "watch": "cd codecompassai && npm run watch"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0"
   }
