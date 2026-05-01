@@ -101,9 +101,51 @@ export function activate(context: vscode.ExtensionContext) {
 	// Keep command alive
 	context.subscriptions.push(summaryCommand);
 
-		
-	console.log('Session file path:', sessionFile);
+    // Register Resume Work command
+    const resumeCommand = vscode.commands.registerCommand(
+    'codecompassai.resumeWork',
+    async () => {
 
+        // Path to session file
+        const sessionFile = path.join(context.globalStorageUri.fsPath, 'session.json');
+
+        if (!fs.existsSync(sessionFile)) {
+            vscode.window.showInformationMessage("No session data found.");
+            return;
+        }
+
+        // Read session data
+        const raw = fs.readFileSync(sessionFile, 'utf-8');
+        const data = JSON.parse(raw);
+
+        const timeline = data.timeline || [];
+
+        if (timeline.length === 0) {
+            vscode.window.showInformationMessage("No recent activity.");
+            return;
+        }
+
+        // Get last worked file
+        const lastFile = timeline[timeline.length - 1].file;
+
+        try {
+            // Open file in editor
+            const doc = await vscode.workspace.openTextDocument(lastFile);
+            await vscode.window.showTextDocument(doc);
+
+            vscode.window.showInformationMessage(`Resumed: ${path.basename(lastFile)}`);
+        } catch (err) {
+            vscode.window.showErrorMessage("Could not open last file.");
+        }
+    }
+);
+
+context.subscriptions.push(resumeCommand);
+
+    
+
+	console.log('Session file path:', sessionFile);
+ 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "codecompassai" is now active!');
@@ -129,7 +171,7 @@ async function showSessionSummary(context: vscode.ExtensionContext){
 	const panel = vscode.window.createWebviewPanel('sessionSummary',
 		'CodeCompass - Session Summary',
 		vscode.ViewColumn.One,
-		{}
+		{enableScripts: true} //It allows the javascript  otherise the onclick will do nothing 
 	);
 	//Path to session file
 	const sessionFile = path.join(context.globalStorageUri.fsPath,'session.json');
@@ -161,6 +203,15 @@ async function showSessionSummary(context: vscode.ExtensionContext){
 	
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);
+    panel.webview.onDidReceiveMessage(
+    async (message) => {
+        if (message.command === 'resumeWork') {
+            // This triggers the existing command you registered
+            vscode.commands.executeCommand('codecompassai.resumeWork');
+        }
+    }
+);
+
 }
 // gives the html summary of the file
 function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
@@ -185,6 +236,10 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
     <body>
         <h2>🧭 Session Summary</h2>
 
+        <button class="resume-btn" onclick="resumeWork()">
+            🚀 Resume Work
+        </button>
+
         <div class="card">
             <div class="stats">
                 <span>Total Saves: ${summary.totalSaves || 0}</span> | 
@@ -205,6 +260,13 @@ function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
         <ul>
             ${items || '<li>No activity recorded yet. Save a file to see it here!</li>'}
         </ul>
+        <script>
+          const vscode = acquireVsCodeApi();
+
+          function resumeWork() {
+          vscode.postMessage({ command: 'resumeWork' });
+         }
+        </script>
     </body>
     </html>
     `;
@@ -279,5 +341,6 @@ function buildSessionSummary(timeline: any[]) {
         recentFiles
     };
 }
+
 // This method is called when your extension is deactivated
 export function deactivate() {}
