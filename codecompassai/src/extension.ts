@@ -8,6 +8,13 @@ import * as path from 'path';
 interface AISummaryResponse {
     summary: string;
 }
+interface AISummaryRequest {
+    totalSaves: number;
+    lastFile: string;
+    mostEditedFile: string;
+    timeline: any[];
+    codeSnippet: string;
+}
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -196,10 +203,27 @@ async function showSessionSummary(context: vscode.ExtensionContext){
         recentFiles: summaryData.recentFiles, // This was likely missing or misnamed before
         timeline: timeline
     };
+    let codeSnippet = "";
+
+    try {
+      const lastEntry = timeline[timeline.length - 1];
+
+      if (lastEntry && fs.existsSync(lastEntry.file)) {
+        const fullCode = fs.readFileSync(lastEntry.file, 'utf-8');
+
+        // take last 1500 characters (recent work)
+        codeSnippet = fullCode.slice(-1500);
+       }
+    } catch (err) {
+    console.error("Error reading code file:", err);
+    }
 	// Call Python AI
-	const aiSummary = await getAISummary(
-	     payload	
-    );
+	const aiSummary = await getAISummary({
+       ...summaryData,
+       timeline,
+       codeSnippet,   
+	   payload	
+    });
 	
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);

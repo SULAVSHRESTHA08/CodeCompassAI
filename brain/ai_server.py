@@ -36,38 +36,38 @@ class SessionData(BaseModel):
     mostEditedFile: str
     timeline: list
     recentFiles: list = []
-
+    codeSnippet: str 
 # Create API endpoint
 @app.post("/summarize")
 def summarize(data: SessionData):
 
     # 🧠 Create AI prompt from session data
     prompt = f"""
-You are a coding assistant.
+You are a coding assistant helping a developer resume work.
 
-Here is a developer's session:
+FILE:
+{data.lastFile}
 
+RECENT CODE:
+{data.codeSnippet}
+
+CONTEXT:
 - Total Saves: {data.totalSaves}
-- Last File: {data.lastFile}
 - Most Edited File: {data.mostEditedFile}
-- Recent Files: {data.recentFiles} 
 
-Timeline:
-{data.timeline}
+Explain clearly:
 
-CRITICAL INSTRUCTION: You must respond ONLY in the following format. 
-Do not write a paragraph. Do not use bold on the headers.
+SUMMARY:
+What this code is doing
 
-SUMMARY: 
-(Write a 1-sentence summary here)
+INTENT:
+What the developer is trying to build
 
-INTENT: 
-(Write the developer's goal here)
+NEXT STEP:
+What they should do next (very specific)
 
-NEXT STEP: 
-(Write one specific coding task here)
+Keep it short and useful.
 """
-
     try:
         # 🔥 Call Gemini
         response = model.generate_content(prompt)
