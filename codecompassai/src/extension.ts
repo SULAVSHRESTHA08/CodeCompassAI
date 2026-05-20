@@ -168,6 +168,26 @@ context.subscriptions.push(resumeCommand);
 	});
     // Cleans up the listner inorder to maintain the latest update
 	context.subscriptions.push(disposable);
+    // Timeout to show the session summary automatically 
+    setTimeout(() => {
+    if (fs.existsSync(sessionFile)) {
+
+        const raw = fs.readFileSync(sessionFile, 'utf-8');
+        const data = JSON.parse(raw);
+
+        if (data.timeline && data.timeline.length > 0) {
+            vscode.commands.executeCommand(
+                'codecompassai.showSessionSummary'
+            );
+        }
+    }
+
+}, 3000);
+
+    // Diagnostics
+	console.log('Session file path:', sessionFile);
+	console.log('Congratulations, your extension "codecompassai" is now active!');
+
 	} catch (error) {
 		console.error('CODECOMPASS ACTIVATION ERROR:', error);
 		vscode.window.showErrorMessage(`CodeCompassAI activation failed: ${error}`);
