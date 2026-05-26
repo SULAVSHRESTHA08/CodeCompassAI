@@ -169,19 +169,57 @@ context.subscriptions.push(resumeCommand);
     // Cleans up the listner inorder to maintain the latest update
 	context.subscriptions.push(disposable);
     // Timeout to show the session summary automatically 
-    setTimeout(() => {
-    if (fs.existsSync(sessionFile)) {
-
+    setTimeout(async() => {
+    if (!fs.existsSync(sessionFile)) {
+        return;
+    }
+    try{
         const raw = fs.readFileSync(sessionFile, 'utf-8');
         const data = JSON.parse(raw);
 
-        if (data.timeline && data.timeline.length > 0) {
-            vscode.commands.executeCommand(
+       // No timeline → do nothing
+        if (!data.timeline || data.timeline.length === 0) {
+            return;
+        }
+
+        // Get last file
+        const lastEntry = data.timeline[data.timeline.length - 1];
+        const lastFile = path.basename(lastEntry.file);
+        const lastTime = new Date(lastEntry.time).getTime();
+        const now = Date.now();
+
+        // difference in hours
+        const hoursSinceLastSession =
+        (now - lastTime) / (1000 * 60 * 60);
+
+        // Ignore very old sessions
+        if (hoursSinceLastSession > 48) {
+          return;
+        }
+        // Show professional notification
+        const selection = await vscode.window.showInformationMessage(
+            `🧭 Resume your previous session?\nLast file: ${lastFile}`,
+            "Open Summary",
+            "Resume Work",
+            "Dismiss"
+        );
+
+        // Handle button actions
+        if (selection === "Open Summary")
+        {
+          vscode.commands.executeCommand(
                 'codecompassai.showSessionSummary'
             );
+        } 
+        else if (selection === "Resume Work") {
+            vscode.commands.executeCommand(
+                'codecompassai.resumeWork'
+            );
         }
-    }
 
+    } catch (err) {
+        console.error("Resume notification error:", err);
+    }
 }, 3000);
 
     // Diagnostics
@@ -213,7 +251,6 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     vscode.window.showInformationMessage('Session Summary opened');
     // Build basic summary 
 	const summaryData = buildSessionSummary(timeline);
-	
     
     //Creating a clean object that matches the python 'SessionData' class
     const payload = {
