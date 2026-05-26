@@ -39,6 +39,8 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	// Set initial text
 	statusBar.text = '🧭 CodeCompass';
+    // Make status bar clickable to open a small menu of actions
+    statusBar.command = 'codecompassai.showMenu';
 	// Show in Vs Code
 	statusBar.show();
     context.subscriptions.push(statusBar);
@@ -168,6 +170,26 @@ context.subscriptions.push(resumeCommand);
 	});
     // Cleans up the listner inorder to maintain the latest update
 	context.subscriptions.push(disposable);
+
+    // Register a small status-bar menu command to open quick actions
+    const menuCommand = vscode.commands.registerCommand('codecompassai.showMenu', async () => {
+        const choice = await vscode.window.showQuickPick([
+            { label: 'Open Session Summary', id: 'summary' },
+            { label: 'Resume Work', id: 'resume' },
+            { label: 'Dismiss', id: 'dismiss' }
+        ], { placeHolder: 'CodeCompass actions' });
+
+        if (!choice) { return; }
+
+        if (choice.id === 'summary') {
+            vscode.commands.executeCommand('codecompassai.showSessionSummary');
+        } else if (choice.id === 'resume') {
+            vscode.commands.executeCommand('codecompassai.resumeWork');
+        } else if (choice.id === 'dismiss') {
+            vscode.window.showInformationMessage('CodeCompass dismissed');
+        }
+    });
+    context.subscriptions.push(menuCommand);
     // Timeout to show the session summary automatically 
     setTimeout(async() => {
     if (!fs.existsSync(sessionFile)) {
