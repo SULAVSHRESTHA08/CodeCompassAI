@@ -8,10 +8,11 @@ import * as path from 'path';
 interface AISummaryResponse {
     summary: string;
 }
-interface AISummaryRequest {
+interface AISummaryRequest{
     totalSaves: number;
     lastFile: string;
     mostEditedFile: string;
+    recentFiles: string[];
     timeline: any[];
     codeSnippet: string;
 }
@@ -297,13 +298,14 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     console.error("Error reading code file:", err);
     }
 	// Call Python AI
-	const aiSummary = await getAISummary({
-       ...summaryData,
-       timeline,
-       codeSnippet,   
-	   payload	
-    });
-	
+   const aiSummary = await getAISummary({
+    totalSaves: summaryData.totalSaves,
+    lastFile: summaryData.lastFile,
+    mostEditedFile: summaryData.mostEditedFile,
+    recentFiles: summaryData.recentFiles,
+    timeline,
+    codeSnippet
+   });
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);
     panel.webview.onDidReceiveMessage(
