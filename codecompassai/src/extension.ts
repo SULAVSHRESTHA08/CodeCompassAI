@@ -5,6 +5,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 // Node.js module for safely constructing file paths
 import * as path from 'path';
+// lets typescript run terminal commands
+import  { execSync } from 'child_process';
 interface AISummaryResponse {
     summary: string;
 }
@@ -15,6 +17,7 @@ interface AISummaryRequest{
     recentFiles: string[];
     timeline: any[];
     codeSnippet: string;
+    gitDiff: string;
 }
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -297,6 +300,8 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     } catch (err) {
     console.error("Error reading code file:", err);
     }
+    // Get the value form Git diff
+    const gitDiff = getGitDiff();
 	// Call Python AI
    const aiSummary = await getAISummary({
     totalSaves: summaryData.totalSaves,
@@ -304,7 +309,8 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     mostEditedFile: summaryData.mostEditedFile,
     recentFiles: summaryData.recentFiles,
     timeline,
-    codeSnippet
+    codeSnippet,
+    gitDiff
    });
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);
@@ -445,7 +451,28 @@ function buildSessionSummary(timeline: any[]) {
         mostEditedFile,
         recentFiles
     };
-}
+ }
+ // Get recent git changes from repository 
+ function getGitDiff(): string {
+ try {
+    //Run git diff command 
+    const diff = execSync('git diff', {
+        encoding: 'utf-8'
+    });
+
+    //Limit huge outputs
+    return diff.slice(0, 4000);
+
+   }catch (error){
+    console.error('Git diff error: ', error);
+    return 'No git changes found.'; 
+   }  
+
+ }
+
+
+
+
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
