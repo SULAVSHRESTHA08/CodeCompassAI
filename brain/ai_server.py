@@ -40,8 +40,9 @@ class SessionData(BaseModel):
     gitDiff: str
 # Create API endpoint
 @app.post("/summarize")
-def summarize(data: SessionData):
-
+async def summarize_session(data: SessionData):
+    print("--- RECEIVED GIT DIFF FROM VS CODE ---")
+    print(data.gitDiff)
     # 🧠 Create AI prompt from session data
     prompt = f"""
 You are a coding assistant.
@@ -73,6 +74,8 @@ What they were trying to achieve
 NEXT STEP:
 What they should do next
 
+Git changes: 
+what is the output of the git changes
 Keep it short and practical.
 """
     try:

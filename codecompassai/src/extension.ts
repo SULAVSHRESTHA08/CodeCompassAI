@@ -455,11 +455,13 @@ function buildSessionSummary(timeline: any[]) {
  // Get recent git changes from repository 
  function getGitDiff(): string {
  try {
+    console.log("🚀 GIT FUNCTION STARTED");
     //Run git diff command 
     const diff = execSync('git diff', {
         encoding: 'utf-8'
     });
-
+console.log("🚀 GIT DIFF RESULT:");
+console.log(diff);
     //Limit huge outputs
     return diff.slice(0, 4000);
 
