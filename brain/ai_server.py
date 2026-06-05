@@ -42,7 +42,12 @@ class SessionData(BaseModel):
 @app.post("/summarize")
 async def summarize_session(data: SessionData):
     print("--- RECEIVED GIT DIFF FROM VS CODE ---")
-    print(data.gitDiff)
+    try:
+        gd = data.gitDiff if data.gitDiff is not None else ""
+        print(repr(gd))
+        print(f"(gitDiff length: {len(gd)})")
+    except Exception as e:
+        print("Error printing gitDiff:", e)
     # 🧠 Create AI prompt from session data
     prompt = f"""
 You are a coding assistant.

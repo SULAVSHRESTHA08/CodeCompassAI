@@ -302,6 +302,8 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     }
     // Get the value form Git diff
     const gitDiff = getGitDiff();
+    console.log('🔍 Git diff value (preview):', gitDiff ? gitDiff.slice(0,200) : gitDiff);
+    console.log('🔍 Git diff length:', gitDiff ? gitDiff.length : 0);
 	// Call Python AI
    const aiSummary = await getAISummary({
     totalSaves: summaryData.totalSaves,
@@ -456,25 +458,31 @@ function buildSessionSummary(timeline: any[]) {
  function getGitDiff(): string {
  try {
     console.log("🚀 GIT FUNCTION STARTED");
-    //Run git diff command 
-    const diff = execSync('git diff', {
-        encoding: 'utf-8'
-    });
-console.log("🚀 GIT DIFF RESULT:");
-console.log(diff);
-    //Limit huge outputs
-    return diff.slice(0, 4000);
+    
+        // Run git diff in the workspace root so it inspects the project repo
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        const cwd = workspaceFolders && workspaceFolders.length > 0
+            ? workspaceFolders[0].uri.fsPath
+            : process.cwd();
 
-   }catch (error){
-    console.error('Git diff error: ', error);
-    return 'No git changes found.'; 
-   }  
+        //Run git diff command in the repo root
+        const diff = execSync('git diff', {
+            encoding: 'utf-8',
+            cwd
+        });
+        console.log('🔎 git diff cwd:', cwd);
 
+        //Trim and limit huge outputs
+        const trimmed = diff.trim();
+        if (!trimmed) {
+            return 'No git changes found.';
+        }
+        return trimmed.slice(0, 4000);
+        } catch (error) {
+            console.error('Git diff error: ', error);
+            return 'No git changes found.';
+        }
  }
-
-
-
-
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
