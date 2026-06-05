@@ -454,34 +454,93 @@ function buildSessionSummary(timeline: any[]) {
         recentFiles
     };
  }
+ function findGitRepoRoot(): string {
+    const folders = vscode.workspace.workspaceFolders || [];
+
+    for (const folder of folders) {
+        const candidate = folder.uri.fsPath;
+        if (fs.existsSync(path.join(candidate, '.git'))) {
+            return candidate;
+        }
+    }
+
+    const activeFile = vscode.window.activeTextEditor?.document.uri.fsPath;
+    if (activeFile) {
+        let current = path.dirname(activeFile);
+        while (true) {
+            if (fs.existsSync(path.join(current, '.git'))) {
+                return current;
+            }
+            const parent = path.dirname(current);
+            if (parent === current) {
+                break;
+            }
+            current = parent;
+        }
+    }
+
+    return process.cwd();
+}
+
  // Get recent git changes from repository 
  function getGitDiff(): string {
  try {
-    console.log("🚀 GIT FUNCTION STARTED");
-    
-        // Run git diff in the workspace root so it inspects the project repo
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        const cwd = workspaceFolders && workspaceFolders.length > 0
-            ? workspaceFolders[0].uri.fsPath
-            : process.cwd();
+    console.log('🚀 GIT FUNCTION STARTED');
 
-        //Run git diff command in the repo root
-        const diff = execSync('git diff', {
-            encoding: 'utf-8',
-            cwd
-        });
-        console.log('🔎 git diff cwd:', cwd);
+    const cwd = findGitRepoRoot();
 
-        //Trim and limit huge outputs
-        const trimmed = diff.trim();
-        if (!trimmed) {
-            return 'No git changes found.';
+    const status = execSync('git status --short', {
+        encoding: 'utf-8',
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    const unstaged = execSync('git --no-pager diff --no-ext-diff --unified=3', {
+        encoding: 'utf-8',
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    const staged = execSync('git --no-pager diff --cached --no-ext-diff --unified=3', {
+        encoding: 'utf-8',
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    const combined = [status.trim(), unstaged.trim(), staged.trim()]
+        .filter(Boolean)
+        .join('\n\n');
+
+    let result = combined;
+
+    if (!result) {
+        try {
+            const lastCommit = execSync('git --no-pager show --stat --summary --format=fuller -1 HEAD', {
+                encoding: 'utf-8',
+                cwd,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            if (lastCommit.trim()) {
+                result = 'LAST COMMIT\n' + lastCommit.trim();
+            }
+        } catch {
+            // Ignore and fall back to the standard empty message.
         }
-        return trimmed.slice(0, 4000);
-        } catch (error) {
-            console.error('Git diff error: ', error);
-            return 'No git changes found.';
-        }
+    }
+
+    console.log('🔎 git diff cwd:', cwd);
+    console.log('🚀 GIT DIFF RESULT:', result ? result.slice(0, 200) : 'No git changes found.');
+
+    if (!result) {
+        return 'No git changes found.';
+    }
+
+    return result.slice(0, 4000);
+ } catch (error) {
+    console.error('Git diff error: ', error);
+    return 'No git changes found.';
+ }
  }
 
 // This method is called when your extension is deactivated
