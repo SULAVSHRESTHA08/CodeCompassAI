@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "compile": "cd codecompassai && npm run compile",
-    "watch": "cd codecompassai && npm run watch"
+    "watch": "cd codecompassai && npm run watch",
+    "package": "cd codecompassai && npm run package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"

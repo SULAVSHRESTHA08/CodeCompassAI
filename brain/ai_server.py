@@ -1,34 +1,24 @@
 # Import required modules
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+from typing import Optional
 
 # 1. Get the exact path to the .env file in the 'brain' folder
 # This finds the folder where ai_server.py is, then looks for .env there
 env_path = Path(__file__).parent / ".env"
 
-#load the environment variables
-load_dotenv(dotenv_path = env_path, override=True) 
-# 3. Debug Print
+# load the environment variables
+load_dotenv(dotenv_path=env_path, override=True) 
+# Debug Print
 print(f"📁 Looking for .env at: {env_path}")
 
 # Create FastAPI app
 app = FastAPI()
 
-# Configure Gemini API
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("❌ ERROR: GEMINI_API_KEY not found in .env file!")
-else:
-    genai.configure(api_key=api_key)
-
-
-# Load model
-model = genai.GenerativeModel(model_name="models/gemini-2.5-flash-lite") #gemini model 2.5 worked 
 # Define expected input structure
 class SessionData(BaseModel):
     totalSaves: int
@@ -36,11 +26,12 @@ class SessionData(BaseModel):
     mostEditedFile: str
     timeline: list
     recentFiles: list = []
-    codeSnippet: str 
-    gitDiff: str
+    codeSnippet: Optional[str] = ""
+    gitDiff: Optional[str] = ""
+
 # Create API endpoint
 @app.post("/summarize")
-async def summarize_session(data: SessionData):
+async def summarize_session(data: SessionData, authorization: Optional[str] = Header(None)):
     print("--- RECEIVED GIT DIFF FROM VS CODE ---")
     try:
         gd = data.gitDiff if data.gitDiff is not None else ""
@@ -48,51 +39,70 @@ async def summarize_session(data: SessionData):
         print(f"(gitDiff length: {len(gd)})")
     except Exception as e:
         print("Error printing gitDiff:", e)
+
+    # 1. Retrieve the API key from Authorization header or environment
+    api_key = None
+    if authorization and authorization.startswith("Bearer "):
+        api_key = authorization.split(" ")[1].strip()
+
+    if not api_key:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Gemini API Key is missing. Please set it in VS Code settings or the backend .env file."
+        )
+
+    # 2. Configure Gemini dynamically for this request
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name="models/gemini-2.5-flash-lite")
+
     # 🧠 Create AI prompt from session data
-    prompt = f"""
-You are a coding assistant.
+    prompt = f"""You are an elite developer's code memory assistant. Analyze the following local session telemetry (saves, file timeline, code snippet, and git diff) to generate a structured, highly actionable resume-work summary.
 
-Here is a developer's session data:
-
+Session Data:
 - Total Saves: {data.totalSaves}
-- Last File: {data.lastFile}
+- Last File Worked On: {data.lastFile}
 - Most Edited File: {data.mostEditedFile}
--Recent Git changes: {data.gitDiff}
+- Recent Files: {data.recentFiles}
 
-Recent Git Changes:
-{data.gitDiff}
-
-Recent Code Snippet:
-{data.codeSnippet}
-
-Timeline:
+Timeline of Saves (Newest last):
 {data.timeline}
 
-Explain:
+Recent Code Snippet (End of last active file):
+```
+{data.codeSnippet}
+```
 
-SUMMARY:
-What the developer worked on
+Git Diff:
+```diff
+{data.gitDiff}
+```
 
-INTENT:
-What they were trying to achieve
+Please structure your response in clean Markdown using exactly the following headings:
+### 📝 Summary
+(Provide a concise, detailed paragraph dissecting exactly what files were changed and what code was added/modified, specifically analyzing the git diff and code snippet above.)
 
-NEXT STEP:
-What they should do next
+### 🎯 Intent
+(Explain what the developer was trying to achieve, the architectural/logical goal of their changes, and the context behind the diff.)
 
-Git changes: 
-what is the output of the git changes
-Keep it short and practical.
+### 🚀 Actionable Next Steps
+(List clear, bulleted tasks the developer should perform next to resume and finish their current task, referencing specific files or lines if relevant.)
+
+Keep the tone professional, technical, direct, and practical. Avoid boilerplate greetings or generic sign-offs.
 """
+
     try:
         # 🔥 Call Gemini
         response = model.generate_content(prompt)
 
         return {
             "summary": response.text
-               }
+        }
 
     except Exception as e:
         # Fallback if AI fails
         return {
             "summary": f"⚠️ AI Error: {str(e)}"
-               }
+        }

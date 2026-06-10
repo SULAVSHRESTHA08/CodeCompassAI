@@ -10,7 +10,7 @@
         "--extensionDevelopmentPath=${workspaceFolder}/codecompassai"
       ],
       "outFiles": [
-        "${workspaceFolder}/codecompassai/out/**/*.js"
+        "${workspaceFolder}/codecompassai/dist/**/*.js"
       ]
     }
   ]

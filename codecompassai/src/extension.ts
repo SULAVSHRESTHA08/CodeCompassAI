@@ -19,6 +19,43 @@ interface AISummaryRequest{
     codeSnippet: string;
     gitDiff: string;
 }
+
+function shouldTrackPath(filePath: string): boolean {
+    try {
+        if (!filePath) {
+            return false;
+        }
+        const uri = vscode.Uri.file(filePath);
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!folder) {
+            return false;
+        }
+
+        const normalizedPath = filePath.replace(/\\/g, '/');
+        const ignoredDirs = ['/node_modules/', '/.git/', '/.vscode/', '/.vscode-test/', '/dist/', '/out/'];
+        if (ignoredDirs.some(dir => normalizedPath.includes(dir))) {
+            return false;
+        }
+
+        const ignoredExtensions = ['.json', '.md', '.txt', '.yaml', '.yml', '.vsix', '.xml', '.config', '.lock'];
+        const ext = path.extname(filePath).toLowerCase();
+        if (ignoredExtensions.includes(ext)) {
+            return false;
+        }
+
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function shouldTrackDocument(document: vscode.TextDocument): boolean {
+    if (document.uri.scheme !== 'file') {
+        return false;
+    }
+    return shouldTrackPath(document.fileName);
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -65,12 +102,15 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Validate structure before using it
             if (Array.isArray(parsed.timeline)) {
+                parsed.timeline = parsed.timeline.filter((entry: any) => shouldTrackPath(entry.file));
                 timelineData = parsed;
 
                 const lastEntry = timelineData.timeline.at(-1);
                 if (lastEntry) {
                     statusBar.text = `🧭 Last: ${path.basename(lastEntry.file)} at ${lastEntry.time}`;
                 }
+                // Save the cleaned timeline back
+                fs.writeFileSync(sessionFile, JSON.stringify(timelineData, null, 2));
             } else {
                 // Old or invalid format → reset safely
                 timelineData = { timeline: [] };
@@ -86,21 +126,26 @@ export function activate(context: vscode.ExtensionContext) {
     }
 	 // Saves the file name whenever the file is saved
     const saveListener = vscode.workspace.onDidSaveTextDocument((document) => {
-	 //Add new save entry
-	timelineData.timeline.push({
-		file: document.fileName,
-		time: new Date().toISOString()
-	 });
-	 //keep only last 20 saves 
-	 timelineData.timeline = timelineData.timeline.slice(-20);
-     // Save updated timeline 
-	 try {
+        // Only track files inside the active workspace and ignore config/md/node_modules files
+        if (!shouldTrackDocument(document)) {
+            return;
+        }
+
+        // Add new save entry
+        timelineData.timeline.push({
+            file: document.fileName,
+            time: new Date().toISOString()
+        });
+        // keep only last 20 saves 
+        timelineData.timeline = timelineData.timeline.slice(-20);
+        // Save updated timeline 
+        try {
             fs.writeFileSync(sessionFile, JSON.stringify(timelineData, null, 2));
         } catch (err) {
             console.error('Failed to write session.json:', err);
         }
-	  //Update status bar text
-	  statusBar.text = `🧭 Last: ${path.basename(document.fileName)} at: ${new Date().toISOString()}`;		
+        // Update status bar text
+        statusBar.text = `🧭 Last: ${path.basename(document.fileName)} at: ${new Date().toISOString()}`;		
 	}); 
     context.subscriptions.push(saveListener);
     
@@ -155,7 +200,30 @@ export function activate(context: vscode.ExtensionContext) {
 
 context.subscriptions.push(resumeCommand);
 
-    
+    // Register Set API Key command
+    const setApiKeyCommand = vscode.commands.registerCommand(
+        'codecompassai.setApiKey',
+        async () => {
+            const currentKey = await context.secrets.get('gemini_api_key');
+            const apiKey = await vscode.window.showInputBox({
+                prompt: 'Enter your Gemini API Key (leave empty to clear existing key)',
+                placeHolder: currentKey ? 'Key is currently set. Enter new key or clear...' : 'AIzaSy...',
+                ignoreFocusOut: true,
+                password: true
+            });
+            if (apiKey === undefined) {
+                return;
+            }
+            if (apiKey === '') {
+                await context.secrets.delete('gemini_api_key');
+                vscode.window.showInformationMessage('Gemini API Key cleared.');
+            } else {
+                await context.secrets.store('gemini_api_key', apiKey);
+                vscode.window.showInformationMessage('Gemini API Key updated successfully.');
+            }
+        }
+    );
+    context.subscriptions.push(setApiKeyCommand);
 
 	console.log('Session file path:', sessionFile);
  
@@ -257,6 +325,23 @@ context.subscriptions.push(resumeCommand);
 		vscode.window.showErrorMessage(`CodeCompassAI activation failed: ${error}`);
 	}
 }
+async function getApiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
+    let apiKey = await context.secrets.get('gemini_api_key');
+    if (!apiKey) {
+        apiKey = await vscode.window.showInputBox({
+            prompt: 'Enter your Gemini API Key to enable CodeCompass AI features',
+            placeHolder: 'AIzaSy...',
+            ignoreFocusOut: true,
+            password: true
+        });
+        if (apiKey) {
+            await context.secrets.store('gemini_api_key', apiKey);
+            vscode.window.showInformationMessage('Gemini API Key saved successfully.');
+        }
+    }
+    return apiKey;
+}
+
 async function showSessionSummary(context: vscode.ExtensionContext){
 	// Create a new panel
 	const panel = vscode.window.createWebviewPanel('sessionSummary',
@@ -274,18 +359,13 @@ async function showSessionSummary(context: vscode.ExtensionContext){
 		const data = JSON.parse(raw);
 		timeline = data.timeline || [];
 	}
+    // Filter the timeline dynamically to exclude legacy tracked files
+    timeline = timeline.filter((entry: any) => shouldTrackPath(entry.file));
+
     vscode.window.showInformationMessage('Session Summary opened');
     // Build basic summary 
 	const summaryData = buildSessionSummary(timeline);
     
-    //Creating a clean object that matches the python 'SessionData' class
-    const payload = {
-        totalSaves: summaryData.totalSaves,
-        lastFile: summaryData.lastFile,
-        mostEditedFile: summaryData.mostEditedFile,
-        recentFiles: summaryData.recentFiles, // This was likely missing or misnamed before
-        timeline: timeline
-    };
     let codeSnippet = "";
 
     try {
@@ -304,6 +384,9 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     const gitDiff = getGitDiff();
     console.log('🔍 Git diff value (preview):', gitDiff ? gitDiff.slice(0,200) : gitDiff);
     console.log('🔍 Git diff length:', gitDiff ? gitDiff.length : 0);
+
+    const apiKey = await getApiKey(context);
+
 	// Call Python AI
    const aiSummary = await getAISummary({
     totalSaves: summaryData.totalSaves,
@@ -313,7 +396,7 @@ async function showSessionSummary(context: vscode.ExtensionContext){
     timeline,
     codeSnippet,
     gitDiff
-   });
+   }, apiKey);
 	// Set HTML content for panel to UI
 	panel.webview.html = getSummaryHtml(timeline, summaryData, aiSummary);
     panel.webview.onDidReceiveMessage(
@@ -328,101 +411,322 @@ async function showSessionSummary(context: vscode.ExtensionContext){
 }
 // gives the html summary of the file
 function getSummaryHtml(timeline: any[], summary: any, aiSummary: string) {
-    const items = timeline.map(entry => `
-        <li>
-            <strong>${path.basename(entry.file)}</strong><br/>
-            <small>${new Date(entry.time).toLocaleString()}</small>
-        </li>
-    `).reverse().join(''); // .reverse() puts the newest saves at the top!
+    const items = timeline.slice().reverse().map(entry => {
+        const baseName = path.basename(entry.file);
+        const relativeDir = path.dirname(entry.file);
+        const displayTime = new Date(entry.time).toLocaleString();
+        return `
+            <li class="activity-item">
+                <div>
+                    <span class="activity-file" title="${entry.file}">${baseName}</span><br/>
+                    <small style="opacity: 0.5; font-size: 11px;">${relativeDir}</small>
+                </div>
+                <span class="activity-time">${displayTime}</span>
+            </li>
+        `;
+    }).join('');
 
     return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CodeCompass - Session Summary</title>
         <style>
-            body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
-            .card { background: rgba(120, 120, 120, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-            h2 { color: #3794ef; }
-            .stats { display: flex; gap: 20px; font-weight: bold; }
+            :root {
+                --bg-color: var(--vscode-editor-background, #1e1e1e);
+                --text-color: var(--vscode-editor-foreground, #d4d4d4);
+                --card-bg: rgba(255, 255, 255, 0.03);
+                --card-border: rgba(255, 255, 255, 0.08);
+                --btn-bg: var(--vscode-button-background, #007acc);
+                --btn-hover: var(--vscode-button-hoverBackground, #0062a3);
+                --btn-text: var(--vscode-button-foreground, #ffffff);
+                --accent-color: var(--vscode-textLink-foreground, #3794ef);
+                --divider-color: rgba(255, 255, 255, 0.1);
+                --font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+            }
+
+            body.vscode-light {
+                --card-bg: rgba(0, 0, 0, 0.03);
+                --card-border: rgba(0, 0, 0, 0.08);
+                --divider-color: rgba(0, 0, 0, 0.1);
+            }
+
+            body {
+                font-family: var(--font-family);
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                padding: 24px;
+                margin: 0;
+                line-height: 1.6;
+            }
+
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                border-bottom: 1px solid var(--divider-color);
+                padding-bottom: 16px;
+            }
+
+            h2, h3 {
+                margin: 0 0 12px 0;
+                font-weight: 600;
+            }
+
+            h2 {
+                color: var(--accent-color);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 24px;
+            }
+
+            h3 {
+                font-size: 18px;
+                color: var(--text-color);
+            }
+
+            .resume-btn {
+                background: var(--btn-bg);
+                color: var(--btn-text);
+                border: none;
+                padding: 10px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: background 0.2s ease, transform 0.1s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+
+            .resume-btn:hover {
+                background: var(--btn-hover);
+                transform: translateY(-1px);
+            }
+
+            .resume-btn:active {
+                transform: translateY(0);
+            }
+
+            /* Glassmorphism Cards */
+            .card {
+                background: var(--card-bg);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid var(--card-border);
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 24px;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .card:hover {
+                border-color: var(--accent-color);
+                box-shadow: 0 8px 32px 0 rgba(55, 148, 239, 0.15);
+            }
+
+            .stats {
+                display: flex;
+                gap: 24px;
+                margin-bottom: 12px;
+                font-size: 14px;
+            }
+
+            .stats-label {
+                opacity: 0.7;
+            }
+
+            .stats-value {
+                color: var(--accent-color);
+                font-weight: bold;
+                margin-left: 4px;
+            }
+
+            /* AI Insights specific styling */
+            .ai-card {
+                border-left: 4px solid var(--accent-color);
+            }
+
+            .ai-content h3 {
+                margin-top: 20px;
+                margin-bottom: 10px;
+                border-bottom: 1px solid var(--divider-color);
+                padding-bottom: 4px;
+                font-size: 16px;
+                color: var(--accent-color);
+            }
+
+            .ai-content p {
+                margin: 0 0 12px 0;
+            }
+
+            .ai-content ul, .ai-content ol {
+                margin: 0 0 12px 0;
+                padding-left: 20px;
+            }
+
+            .ai-content li {
+                margin-bottom: 6px;
+            }
+
+            .ai-content code {
+                font-family: var(--vscode-editor-font-family, monospace);
+                background: rgba(120, 120, 120, 0.15);
+                padding: 2px 5px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+
+            .ai-content pre {
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid var(--card-border);
+                border-radius: 8px;
+                padding: 12px;
+                overflow-x: auto;
+                margin: 12px 0;
+            }
+
+            .ai-content pre code {
+                background: transparent;
+                padding: 0;
+                font-size: 12px;
+            }
+
+            /* Recent Activity List */
+            .activity-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .activity-item {
+                padding: 12px;
+                border-bottom: 1px solid var(--divider-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                transition: background-color 0.2s ease;
+                border-radius: 6px;
+            }
+
+            .activity-item:hover {
+                background-color: rgba(255, 255, 255, 0.02);
+            }
+
+            body.vscode-light .activity-item:hover {
+                background-color: rgba(0, 0, 0, 0.02);
+            }
+
+            .activity-file {
+                font-weight: 500;
+                color: var(--text-color);
+            }
+
+            .activity-time {
+                font-size: 12px;
+                opacity: 0.6;
+            }
         </style>
     </head>
     <body>
-        <h2>🧭 Session Summary</h2>
-
-        <button class="resume-btn" onclick="resumeWork()">
-            🚀 Resume Work
-        </button>
-
-        <div class="card">
-            <div class="stats">
-                <span>Total Saves: ${summary.totalSaves || 0}</span> | 
-                <span>Most Edited: ${summary.mostEditedFile || 'None yet'}</span>
+        <div class="container">
+            <div class="header">
+                <h2>🧭 CodeCompass - Session Summary</h2>
+                <button class="resume-btn" onclick="resumeWork()">
+                    🚀 Resume Work
+                </button>
             </div>
-            <p><strong>Last File Worked On:</strong> ${summary.lastFile || 'None'}</p>
+
+            <div class="card">
+                <div class="stats">
+                    <div>
+                        <span class="stats-label">Total Saves:</span>
+                        <span class="stats-value">${summary.totalSaves || 0}</span>
+                    </div>
+                    <div>
+                        <span class="stats-label">Most Edited:</span>
+                        <span class="stats-value">${summary.mostEditedFile || 'None yet'}</span>
+                    </div>
+                </div>
+                <p style="margin: 8px 0 0 0;"><strong>Last File Worked On:</strong> ${summary.lastFile || 'None'}</p>
+            </div>
+
+            <div class="card ai-card">
+                <h3>🤖 AI Insights</h3>
+                <div id="ai-insights-content" class="ai-content">
+                    <p>Analyzing changes and generating summary...</p>
+                </div>
+            </div>
+
+            <h3>📜 Recent Activity</h3>
+            <div class="card">
+                <ul class="activity-list">
+                    ${items || '<li class="activity-item">No activity recorded yet. Save a file to see it here!</li>'}
+                </ul>
+            </div>
         </div>
 
-        <div class="card" style="border-left: 4px solid #3794ef;">
-            <h3>🤖 AI Insights</h3>
-
-            ${formatAI(aiSummary) || "<p>Thinking.....</p>"}
-        </div>
-
-        <hr/>
-
-        <h3>📜 Recent Activity</h3>
-        <ul>
-            ${items || '<li>No activity recorded yet. Save a file to see it here!</li>'}
-        </ul>
+        <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
         <script>
-          const vscode = acquireVsCodeApi();
+            const vscode = acquireVsCodeApi();
 
-          function resumeWork() {
-          vscode.postMessage({ command: 'resumeWork' });
-         }
+            function resumeWork() {
+                vscode.postMessage({ command: 'resumeWork' });
+            }
+
+            // Parse and render raw markdown inside the webview using markdown-it
+            const rawAiText = ${JSON.stringify(aiSummary)};
+            try {
+                const md = window.markdownit({ 
+                    html: true, 
+                    linkify: true, 
+                    typographer: true 
+                });
+                document.getElementById('ai-insights-content').innerHTML = md.render(rawAiText);
+            } catch (e) {
+                document.getElementById('ai-insights-content').innerHTML = '<p>' + rawAiText.replace(/\\n/g, '<br>') + '</p>';
+            }
         </script>
     </body>
     </html>
     `;
 }
-// Updated AI summary Visuals
-function formatAI(text: string) {
-    // This Regex looks for the keywords even if they are all on one line
-    const summaryMatch = text.match(/SUMMARY:(.*?)(?=INTENT:|NEXT STEP:|$)/is);
-    const intentMatch = text.match(/INTENT:(.*?)(?=SUMMARY:|NEXT STEP:|$)/is);
-    const nextMatch = text.match(/NEXT STEP:(.*?)(?=SUMMARY:|INTENT:|$)/is);
 
-    const sections = {
-        summary: summaryMatch ? summaryMatch[1].trim() : "",
-        intent: intentMatch ? intentMatch[1].trim() : "",
-        next: nextMatch ? nextMatch[1].trim() : ""
-    };
-
-    // If Regex fails (maybe AI didn't use keywords), show the raw text as fallback
-    if (!sections.summary && !sections.intent && !sections.next) {
-        return `<p>${text}</p>`;
-    }
-
-    return `
-        <div>
-            <p><strong>📌 Summary:</strong> ${sections.summary || "Not detected"}</p>
-            <p><strong>🎯 Intent:</strong> ${sections.intent || "Not detected"}</p>
-            <p><strong>🚀 Next Step:</strong> ${sections.next || "Not detected"}</p>
-        </div>
-    `;
-}// Send session data to python AI server
-async function getAISummary(sessionData: any)
+// Send session data to python AI server
+async function getAISummary(sessionData: any, apiKey?: string)
 {
   try
   {
-const response = await fetch('http://127.0.0.1:8000/summarize', {
-	method: 'POST',
-	headers: {
-		'Content-Type' : 'application/json'
-	},
-    body: JSON.stringify(sessionData)
-   });
-   const data = await response.json() as AISummaryResponse;
-   return data.summary || "No summary provided by AI.";
+    const headers: Record<string, string> = {
+        'Content-Type' : 'application/json'
+    };
+    if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+    const response = await fetch('http://127.0.0.1:8000/summarize', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(sessionData)
+    });
+    
+    if (response.status === 401) {
+        return "⚠️ Unauthorized: Gemini API Key is invalid or missing. Run the command `CodeCompass: Set Gemini API Key` to set it.";
+    }
+
+    const data = await response.json() as AISummaryResponse;
+    return data.summary || "No summary provided by AI.";
   }
   catch(error) 
   {
@@ -454,17 +758,11 @@ function buildSessionSummary(timeline: any[]) {
         recentFiles
     };
  }
- function findGitRepoRoot(): string {
+function findGitRepoRoot(): string {
     const folders = vscode.workspace.workspaceFolders || [];
-
-    for (const folder of folders) {
-        const candidate = folder.uri.fsPath;
-        if (fs.existsSync(path.join(candidate, '.git'))) {
-            return candidate;
-        }
-    }
-
     const activeFile = vscode.window.activeTextEditor?.document.uri.fsPath;
+
+    // 1. Check active file first and search upwards for a .git directory
     if (activeFile) {
         let current = path.dirname(activeFile);
         while (true) {
@@ -479,6 +777,33 @@ function buildSessionSummary(timeline: any[]) {
         }
     }
 
+    // 2. Check workspace folders and search upwards for a .git directory
+    for (const folder of folders) {
+        const candidate = folder.uri.fsPath;
+        let current = candidate;
+        while (true) {
+            if (fs.existsSync(path.join(current, '.git'))) {
+                return current;
+            }
+            const parent = path.dirname(current);
+            if (parent === current) {
+                break;
+            }
+            current = parent;
+        }
+    }
+
+    // 3. Fallback to the first workspace folder path if any folders are open
+    if (folders.length > 0) {
+        return folders[0].uri.fsPath;
+    }
+
+    // 4. Fallback to the active file directory if available
+    if (activeFile) {
+        return path.dirname(activeFile);
+    }
+
+    // Last resort fallback
     return process.cwd();
 }
 
