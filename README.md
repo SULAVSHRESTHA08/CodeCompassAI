@@ -16,15 +16,15 @@ Whether you took a break for a couple of hours or a few days, CodeCompassAI help
 
 ## ✨ Key Features
 
-*   **📂 Active Session Telemetry:** Automatically tracks your file saves, timestamps, and active workspace files while dynamically ignoring `node_modules`, build directories (`out/`, `dist/`), and configuration files.
-*   **🔍 Git & Code Snippet Analysis:** Programmatically captures your unstaged and staged git changes, along with the last 1,500 characters of your last active file, to give the AI engine deep workspace context.
-*   **🤖 Gemini AI Insights:** Uses Google's Gemini API to analyze session data and produce a structured Markdown report featuring:
-    *   **📝 Summary:** A clear explanation of what code was recently added or modified.
-    *   **🎯 Intent:** The logical or architectural goal behind those changes.
-    *   **🚀 Actionable Next Steps:** Precise, bulleted tasks to help you immediately resume work.
-*   **📊 Glassmorphism Dashboard:** A custom-designed VS Code Webview panel showing session stats (Total Saves, Most Edited File), recent activity timeline, and AI insights.
-*   **🔔 Contextual Resume Notifications:** 3 seconds after VS Code starts, if you worked on the project within the last 48 hours, a non-intrusive notification prompts you to either **Open Summary** or **Resume Work** (instantly opening the last file at your last edit point).
-*   **🔑 Secure Token Storage:** Utilizes VS Code's native `SecretStore` to securely store and retrieve your Gemini API key, ensuring no keys are exposed in your code repository.
+*   **  Active Session Telemetry:** Automatically tracks your file saves, timestamps, and active workspace files while dynamically ignoring `node_modules`, build directories (`out/`, `dist/`), and configuration files.
+*   **  Git & Code Snippet Analysis:** Programmatically captures your unstaged and staged git changes, along with the last 1,500 characters of your last active file, to give the AI engine deep workspace context.
+*   ** Gemini AI Insights:** Uses Google's Gemini API to analyze session data and produce a structured Markdown report featuring:
+    *   ** Summary:** A clear explanation of what code was recently added or modified.
+    *   ** Intent:** The logical or architectural goal behind those changes.
+    *   ** Actionable Next Steps:** Precise, bulleted tasks to help you immediately resume work.
+*   ** Glassmorphism Dashboard:** A custom-designed VS Code Webview panel showing session stats (Total Saves, Most Edited File), recent activity timeline, and AI insights.
+*   ** Contextual Resume Notifications:** 3 seconds after VS Code starts, if you worked on the project within the last 48 hours, a non-intrusive notification prompts you to either **Open Summary** or **Resume Work** (instantly opening the last file at your last edit point).
+*   ** Secure Token Storage:** Utilizes VS Code's native `SecretStore` to securely store and retrieve your Gemini API key, ensuring no keys are exposed in your code repository.
 
 ---
 
