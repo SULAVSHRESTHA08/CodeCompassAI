@@ -1,4 +1,4 @@
-# 🧭 CodeCompassAI
+#  CodeCompassAI
 
 **CodeCompassAI** is a local-first, context-aware developer assistant built as a VS Code extension. It is designed to act as your personal "code memory assistant" to solve a common developer pain point: losing workflow context after stepping away from a project. 
 
@@ -6,7 +6,7 @@ Whether you took a break for a couple of hours or a few days, CodeCompassAI help
 
 ---
 
-## 🎯 The Problem & The Solution
+##  The Problem & The Solution
 
 **The Problem:** Context switching is expensive. When developers return to a project after a break, they often spend 15–30 minutes reading through files, reviewing recent git logs, and asking themselves: *“What was I doing? Why did I change this code? Where was I heading next?”*
 
@@ -14,7 +14,7 @@ Whether you took a break for a couple of hours or a few days, CodeCompassAI help
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 *   **  Active Session Telemetry:** Automatically tracks your file saves, timestamps, and active workspace files while dynamically ignoring `node_modules`, build directories (`out/`, `dist/`), and configuration files.
 *   **  Git & Code Snippet Analysis:** Programmatically captures your unstaged and staged git changes, along with the last 1,500 characters of your last active file, to give the AI engine deep workspace context.
@@ -28,7 +28,7 @@ Whether you took a break for a couple of hours or a few days, CodeCompassAI help
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```mermaid
 graph TD
@@ -42,7 +42,7 @@ graph TD
 
 ---
 
-## 🚀 Setup & Installation
+##  Setup & Installation
 
 CodeCompassAI consists of two parts: the **VS Code Extension** and a **Local Python FastAPI Backend** that communicates with the Gemini API.
 
@@ -84,7 +84,7 @@ Once installed:
 
 ---
 
-## 🛠️ Development & Compiling (Optional)
+##  Development & Compiling (Optional)
 
 If you wish to modify or build the extension from source:
 
@@ -105,6 +105,6 @@ If you wish to modify or build the extension from source:
 
 ---
 
-## 🤝 Contributing & Feedback
+##  Contributing & Feedback
 
 This is a personal learning project and is open to suggestions! If you have ideas on optimizing the telemetry tracking, improving the Webview styling, or refining the prompt engineering, feel free to open an issue or submit a pull request.
